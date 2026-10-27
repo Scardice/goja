@@ -352,10 +352,15 @@ func TestGoMapReflectKeyToString(t *testing.T) {
 func TestGoMapReflectNil(t *testing.T) {
 	vm := New()
 
+	// Scardice: a nil map is an empty JS object, not null.
 	t.Run("nil map", func(t *testing.T) {
 		var m map[string]int
-		if v := vm.ToValue(m); v != _null {
-			t.Fatal(v)
+		v := vm.ToValue(m)
+		if v == _null {
+			t.Fatal("nil map became null")
+		}
+		if n := len(v.(*Object).Keys()); n != 0 {
+			t.Fatal(n)
 		}
 	})
 

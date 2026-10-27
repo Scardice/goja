@@ -511,10 +511,15 @@ func TestGoSliceReflectExternalLenUpdate(t *testing.T) {
 
 func TestGoSliceReflectNil(t *testing.T) {
 	vm := New()
+	// Scardice: a nil slice is an empty JS array-like, not null.
 	t.Run("nil slice", func(t *testing.T) {
 		var a []int
-		if v := vm.ToValue(a); v != _null {
-			t.Fatal(v)
+		v := vm.ToValue(a)
+		if v == _null {
+			t.Fatal("nil slice became null")
+		}
+		if n := v.(*Object).Get("length").ToInteger(); n != 0 {
+			t.Fatal(n)
 		}
 	})
 
