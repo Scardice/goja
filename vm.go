@@ -2823,7 +2823,11 @@ func (_pushArrayItem) exec(vm *vm) {
 		return
 	}
 	val := vm.stack[vm.sp-1]
+	full := len(arr.values) == cap(arr.values)
 	arr.values = append(arr.values, val)
+	if full {
+		arr.noteGrowth()
+	}
 	if val != nil {
 		arr.objCount++
 	}
@@ -2844,7 +2848,11 @@ func (_pushArraySpread) exec(vm *vm) {
 			vm.throw(vm.r.newError(vm.r.getRangeError(), "Invalid array length"))
 			return
 		}
+		full := len(arr.values) == cap(arr.values)
 		arr.values = append(arr.values, val)
+		if full {
+			arr.noteGrowth()
+		}
 		arr.objCount++
 	})
 	vm.sp--

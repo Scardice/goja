@@ -483,8 +483,12 @@ func (r *Runtime) arrayproto_splice(call FunctionCall) Value {
 		if itemCount > 0 {
 			copy(values[actualStart:], call.Arguments[2:])
 		}
+		grew := cap(values) != cap(src.values)
 		src.values = values
 		src.objCount = len(values)
+		if grew {
+			src.noteGrowth()
+		}
 	} else {
 		for k := int64(0); k < actualDeleteCount; k++ {
 			from := valueInt(k + actualStart)
@@ -549,6 +553,7 @@ func (r *Runtime) arrayproto_unshift(call FunctionCall) Value {
 				values := make([]Value, newSize)
 				copy(values[argCount:], arr.values)
 				arr.values = values
+				arr.noteGrowth()
 			}
 			copy(arr.values, call.Arguments)
 			arr.objCount = int(arr.length)

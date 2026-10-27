@@ -1,6 +1,9 @@
 package goja
 
-import "unsafe"
+import (
+	"math/rand/v2"
+	"unsafe"
+)
 
 // AllocationKind names the kinds of objects an AllocationTracker hears about.
 type AllocationKind uint8
@@ -133,7 +136,8 @@ var (
 // ArrayBuffer, and the strings and boxed numbers it holds directly. Objects it
 // references are not included; a string shared by several holders is counted
 // by each. Above approxPayloadScan elements or properties the payload is
-// extrapolated from an even sample, so the cost stays bounded.
+// estimated from a stratified random sample, so the cost stays bounded and
+// repeated calls on a large object may differ slightly.
 //
 // It must be called on the goroutine that runs o's Runtime.
 func (o *Object) ApproximateSize() int {
@@ -161,7 +165,7 @@ func (o *baseObject) ownPropertyBytes() int {
 		size += approxMapBytes(len(o.values))
 	}
 	if o.symValues != nil {
-		size += approxMapBytes(o.symValues.size) + o.symValues.size*approxMapEntryNode
+		size += approxMapBytes(o.symValues.size) + o.symValues.size*approxMapEntryNode + o.symbolPayload()
 	}
 	names := o.propNames
 	return size + sampledPayload(len(names), func(i int) int {
@@ -170,22 +174,38 @@ func (o *baseObject) ownPropertyBytes() int {
 	})
 }
 
-// sampledPayload sums payload(i) over n items, reading at most about
-// approxPayloadScan of them and scaling up.
-func sampledPayload(n int, payload func(i int) int) int {
-	if n == 0 {
-		return 0
-	}
-	step := max(n/approxPayloadScan, 1)
+// symbolPayload reads the values of at most approxPayloadScan symbol-keyed
+// properties, in insertion order, and scales up. Objects rarely have many.
+func (o *baseObject) symbolPayload() int {
 	total, read := 0, 0
-	for i := 0; i < n; i += step {
-		total += payload(i)
+	for e := o.symValues.iterFirst; e != nil && read < approxPayloadScan; e = e.iterNext {
+		total += valuePayload(e.value)
 		read++
 	}
-	if read == n {
+	if read == 0 || read == o.symValues.size {
 		return total
 	}
-	return int(int64(total) * int64(n) / int64(read))
+	return int(int64(total) * int64(o.symValues.size) / int64(read))
+}
+
+// sampledPayload sums payload(i) over n items. Above approxPayloadScan items
+// it reads one random item from each of approxPayloadScan equal strata and
+// weights it by the stratum's size: the cost stays bounded and no periodic
+// layout of the data can line up with the items read.
+func sampledPayload(n int, payload func(i int) int) int {
+	if n <= approxPayloadScan {
+		total := 0
+		for i := range n {
+			total += payload(i)
+		}
+		return total
+	}
+	var total int64
+	for stratum := range approxPayloadScan {
+		lo, hi := stratum*n/approxPayloadScan, (stratum+1)*n/approxPayloadScan
+		total += int64(payload(lo+rand.IntN(hi-lo))) * int64(hi-lo)
+	}
+	return int(total)
 }
 
 func valuePayload(v Value) int {

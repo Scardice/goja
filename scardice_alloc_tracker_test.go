@@ -1,6 +1,7 @@
 package goja
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -108,6 +109,10 @@ func TestAllocationTrackerHearsWhenObjectsBecomeLarge(t *testing.T) {
 		{"dictionary object", "const o = {}; for (let i = 0; i < 2048; i++) o['k' + i] = i; o", AllocationObject, 2048 * 32},
 		{"sparse array", "const s = []; for (let i = 0; i < 2048; i++) s[i * 100000] = i; s", AllocationArray, 2048 * approxSparseItem},
 		{"typed array copy", "new Uint8Array(new Uint16Array(100000)).buffer", AllocationArrayBuffer, 100000},
+		{"spread", "const src = Array.from({length: 5000}, (_, i) => i); [0, ...src]", AllocationArray, 5000 * approxValueSlot},
+		{"literal items", "[" + strings.Repeat("1,", 3000) + "]", AllocationArray, 3000 * approxValueSlot},
+		{"splice insert", "const a = [1, 2, 3]; a.splice(1, 0, ...Array(3000).fill(0)); a", AllocationArray, 3000 * approxValueSlot},
+		{"unshift", "const a = [1]; a.unshift(...Array(3000).fill(0)); a", AllocationArray, 3000 * approxValueSlot},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, tracker, o := trackedRun(t, tc.script)
@@ -155,9 +160,9 @@ func TestApproximateSizeFollowsTheStorageAnObjectOwns(t *testing.T) {
 	if numbers < 10000*approxValueSlot || numbers > 10000*(approxValueSlot+approxBoxed)*2 {
 		t.Fatalf("10000 numbers estimated at %d", numbers)
 	}
-	strings := size("Array.from({length: 10000}, (_, i) => 'x'.repeat(100) + i)")
-	if strings < 10000*100 || strings > 10000*(100+approxValueSlot)*2 {
-		t.Fatalf("10000 strings of ~104 bytes estimated at %d", strings)
+	texts := size("Array.from({length: 10000}, (_, i) => 'x'.repeat(100) + i)")
+	if texts < 10000*100 || texts > 10000*(100+approxValueSlot)*2 {
+		t.Fatalf("10000 strings of ~104 bytes estimated at %d", texts)
 	}
 	dict := size("const d = {}; for (let i = 0; i < 5000; i++) d['key' + i] = 'v'.repeat(50); d")
 	if perEntry := approxMapGroup/7 + approxValueSlot + 50 + 10; dict < 5000*(32+50) || dict > 5000*perEntry*2 {
@@ -168,5 +173,27 @@ func TestApproximateSizeFollowsTheStorageAnObjectOwns(t *testing.T) {
 	}
 	if fn := size("(function () {})"); fn <= 0 {
 		t.Fatalf("function size %d", fn)
+	}
+	if symbol := size("({ [Symbol('s')]: 'q'.repeat(5000) })"); symbol < 5000 {
+		t.Fatalf("a string held under a symbol key was not counted: %d", symbol)
+	}
+}
+
+// Numbers at even and long strings at odd indexes would hide every string
+// from a sample that reads every fourth element from the start.
+func TestApproximateSizeSamplingDoesNotFollowTheDataLayout(t *testing.T) {
+	r := New()
+	v, err := r.RunString("Array.from({length: 40960}, (_, i) => i % 2 ? 'z'.repeat(200) + i : i)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	arr := v.(*Object)
+	slots := cap(arr.self.(*arrayObject).values) * approxValueSlot
+	want := 20480*approxBoxed + 20480*(approxConcatString+205)
+	for range 5 {
+		payload := arr.ApproximateSize() - slots
+		if payload < want*85/100 || payload > want*115/100 {
+			t.Fatalf("payload estimated at %d, want about %d", payload, want)
+		}
 	}
 }
