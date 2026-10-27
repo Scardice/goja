@@ -564,6 +564,7 @@ func (o *baseObject) setOwnStr(name unistring.String, val Value, throw bool) boo
 			o.values[name] = val
 			names := copyNamesIfNeeded(o.propNames, 1)
 			o.propNames = append(names, name)
+			o.notePropertyGrowth()
 		}
 		return true
 	}
@@ -847,6 +848,7 @@ func (o *baseObject) defineOwnPropertyStr(name unistring.String, descr PropertyD
 		if existingVal == nil {
 			names := copyNamesIfNeeded(o.propNames, 1)
 			o.propNames = append(names, name)
+			o.notePropertyGrowth()
 		}
 		return true
 	}
@@ -876,6 +878,7 @@ func (o *baseObject) _put(name unistring.String, v Value) {
 	if _, exists := o.values[name]; !exists {
 		names := copyNamesIfNeeded(o.propNames, 1)
 		o.propNames = append(names, name)
+		o.notePropertyGrowth()
 	}
 
 	o.values[name] = v

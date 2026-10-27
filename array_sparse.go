@@ -153,6 +153,7 @@ func (a *sparseArrayObject) add(idx uint32, val Value) {
 		idx:   idx,
 		value: val,
 	}
+	a.noteGrowth()
 }
 
 func (a *sparseArrayObject) _setOwnIdx(idx uint32, val Value, throw bool) bool {
@@ -189,6 +190,7 @@ func (a *sparseArrayObject) _setOwnIdx(idx uint32, val Value, throw bool) bool {
 				idx:   idx,
 				value: val,
 			}
+			a.noteGrowth()
 		} else {
 			ar := a.val.self.(*arrayObject)
 			ar.values[idx] = val
@@ -288,6 +290,9 @@ func (a *sparseArrayObject) setValues(values []Value, objCount int) {
 			})
 		}
 	}
+	if len(a.items) >= GrowthReportFloor {
+		a.val.runtime.noteGrown(a.val, AllocationArray, cap(a.items)*approxSparseItem)
+	}
 }
 
 func (a *sparseArrayObject) hasOwnPropertyStr(name unistring.String) bool {
@@ -363,6 +368,7 @@ func (a *sparseArrayObject) _defineIdxProperty(idx uint32, desc PropertyDescript
 					idx:   idx,
 					value: prop,
 				}
+				a.noteGrowth()
 				if idx >= a.length {
 					a.length = idx + 1
 				}

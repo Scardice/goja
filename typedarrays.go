@@ -130,6 +130,7 @@ func (a ArrayBuffer) Detached() bool {
 func (r *Runtime) NewArrayBuffer(data []byte) ArrayBuffer {
 	buf := r._newArrayBuffer(r.getArrayBufferPrototype(), nil)
 	buf.data = data
+	r.noteAllocated(buf.val, AllocationArrayBuffer, len(data))
 	return ArrayBuffer{
 		buf: buf,
 	}

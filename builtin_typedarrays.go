@@ -90,6 +90,7 @@ func (r *Runtime) builtin_newArrayBuffer(args []Value, newTarget *Object) *Objec
 	if len(args) > 0 {
 		b.data = allocByteSlice(r.toIndex(args[0]))
 	}
+	r.noteAllocated(b.val, AllocationArrayBuffer, len(b.data))
 	return b.val
 }
 
@@ -175,6 +176,7 @@ func (r *Runtime) arrayBufferCopyAndDetach(this, newLength Value) Value {
 	b.detach()
 	newBuffer := r._newArrayBuffer(r.getArrayBufferPrototype(), nil)
 	newBuffer.data = data
+	r.noteAllocated(newBuffer.val, AllocationArrayBuffer, len(data))
 	return newBuffer.val
 }
 
@@ -622,6 +624,7 @@ func (r *Runtime) typedArrayProto_filter(call FunctionCall) Value {
 		c := r.speciesConstructorObj(o, ta.defaultCtor)
 		ab := r._newArrayBuffer(r.getArrayBufferPrototype(), nil)
 		ab.data = buf
+		r.noteAllocated(ab.val, AllocationArrayBuffer, len(buf))
 		kept := r.toConstructor(ta.defaultCtor)([]Value{ab.val}, ta.defaultCtor)
 		if c == ta.defaultCtor {
 			return kept
@@ -1405,6 +1408,7 @@ func (r *Runtime) allocateTypedArray(newTarget *Object, length int, taCtor typed
 	if length > 0 {
 		buf.data = allocByteSlice(length * ta.elemSize)
 	}
+	r.noteAllocated(buf.val, AllocationArrayBuffer, len(buf.data))
 	return ta
 }
 
@@ -1523,6 +1527,7 @@ func (r *Runtime) _newTypedArrayFromTypedArray(src *typedArrayObject, newTarget 
 	l := src.length
 
 	dst.viewedArrayBuf.data = allocByteSlice(safeMul(l, dst.elemSize))
+	r.noteGrown(dst.viewedArrayBuf.val, AllocationArrayBuffer, len(dst.viewedArrayBuf.data))
 	src.viewedArrayBuf.ensureNotDetached(true)
 	if src.defaultCtor == dst.defaultCtor {
 		copy(dst.viewedArrayBuf.data, src.viewedArrayBuf.data[src.offset*src.elemSize:])
@@ -1544,6 +1549,7 @@ func (r *Runtime) _newTypedArrayFromTypedArray(src *typedArrayObject, newTarget 
 func (r *Runtime) newTypedArrayWithData(data []byte, newTarget *Object, taCtor typedArrayObjectCtor, proto *Object) *typedArrayObject {
 	ab := r._newArrayBuffer(r.getArrayBufferPrototype(), nil)
 	ab.data = data
+	r.noteAllocated(ab.val, AllocationArrayBuffer, len(data))
 	ta := taCtor(ab, 0, 0, r.getPrototypeFromCtor(newTarget, nil, proto))
 	ta.length = len(data) / ta.elemSize
 	return ta

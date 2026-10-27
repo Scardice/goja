@@ -207,6 +207,7 @@ type Runtime struct {
 
 	promiseRejectionTracker PromiseRejectionTracker
 	asyncContextTracker     AsyncContextTracker
+	allocTracker            AllocationTracker
 
 	// Stack for tracking objects currently being converted to string
 	// to detect and handle circular references
@@ -516,7 +517,11 @@ func newGuardedObj(proto *Object, class string) *guardedObject {
 
 func (r *Runtime) newBaseObject(proto *Object, class string) (o *baseObject) {
 	v := &Object{runtime: r}
-	return newBaseObjectObj(v, proto, class)
+	o = newBaseObjectObj(v, proto, class)
+	if r.allocTracker != nil && class == classObject {
+		r.allocTracker.Allocated(v, AllocationObject, 0)
+	}
+	return o
 }
 
 func (r *Runtime) newGuardedObject(proto *Object, class string) (o *guardedObject) {

@@ -383,6 +383,7 @@ func (a *arrayObject) expand(idx uint32) bool {
 				newValues := make([]Value, tl, growCap(tl, len(a.values), cap(a.values)))
 				copy(newValues, a.values)
 				a.values = newValues
+				a.noteGrowth()
 			}
 		}
 	}
@@ -571,6 +572,7 @@ func (a *arrayObject) setValuesFromSparse(items []sparseArrayItem, newMaxIdx int
 		a.values[item.idx] = item.value
 	}
 	a.objCount = len(items)
+	a.noteGrowth()
 }
 
 func toIdx(v valueInt) uint32 {

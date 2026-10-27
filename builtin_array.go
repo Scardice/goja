@@ -16,6 +16,7 @@ func (r *Runtime) newArray(prototype *Object) (a *arrayObject) {
 	v.self = a
 	a.prototype = prototype
 	a.init()
+	r.noteAllocated(v, AllocationArray, 0)
 	return
 }
 
@@ -27,6 +28,7 @@ func setArrayValues(a *arrayObject, values []Value) *arrayObject {
 	a.values = values
 	a.length = uint32(len(values))
 	a.objCount = len(values)
+	a.noteGrowth()
 	return a
 }
 
